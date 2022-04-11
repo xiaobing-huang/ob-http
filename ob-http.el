@@ -205,6 +205,7 @@
 
 (defun org-babel-execute:http (body params)
   (let* ((request (ob-http-parse-request (org-babel-expand-body:http body params)))
+         (print-curl (assoc :print-curl params))
          (proxy (cdr (assoc :proxy params)))
          (noproxy (assoc :noproxy params))
          (follow-redirect (and (assoc :follow-redirect params) (not (string= "no" (cdr (assoc :follow-redirect params))))))
@@ -242,6 +243,10 @@
                                         ob-http:max-time))
                      "--globoff"
                      (ob-http-construct-url (ob-http-request-url request) params)))))
+    (if print-curl
+        (concat "curl "
+                (string-join (mapcar 'shell-quote-argument (ob-http-flatten args)) " ")
+                "\n")
     (with-current-buffer (get-buffer-create "*curl commands history*")
       (goto-char (point-max))
       (insert "curl "
@@ -249,7 +254,7 @@
               "\n"))
     (with-current-buffer (get-buffer-create "*curl output*")
       (erase-buffer)
-      (if (= 0 (apply 'call-process "curl" nil `(t ,error-output) nil (ob-http-flatten args)))
+      (if (= 0 (apply 'process-file "curl" nil `(t ,error-output) nil (ob-http-flatten args)))
           (let ((response (ob-http-parse-response (buffer-string))))
             (when prettify (ob-http-pretty-response response (cdr pretty)))
             (when ob-http:remove-cr (ob-http-remove-carriage-return response))
@@ -262,7 +267,7 @@
           (princ (with-temp-buffer
                    (insert-file-contents-literally error-output)
                    (s-join "\n" (s-lines (buffer-string)))))
-          "")))))
+          ""))))))
 
 (defun ob-http-export-expand-variables (&optional backend)
   "Scan current buffer for all HTTP source code blocks and expand variables.
