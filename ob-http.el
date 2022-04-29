@@ -220,8 +220,12 @@
          (resolve (cdr (assoc :resolve params)))
          (request-body (ob-http-request-body request))
          (error-output (org-babel-temp-file "curl-error"))
+         (url (ob-http-construct-url (ob-http-request-url request) params))
+         (global-proxy (url-find-proxy-for-url (url-generic-parse-url url)
+                                               (url-host (url-generic-parse-url url))))
          (args (append ob-http:curl-custom-arguments (list "-i"
                      (when (and proxy (not noproxy)) `("-x" ,proxy))
+                     (when (and global-proxy (not noproxy) (not proxy)) `("-x" ,global-proxy))
                      (when noproxy '("--noproxy" "*"))
                      (let ((method (ob-http-request-method request)))
                        (if (string= "HEAD" method) "-I" `("-X" ,method)))
@@ -242,7 +246,7 @@
                      (int-to-string (or (cdr (assoc :max-time params))
                                         ob-http:max-time))
                      "--globoff"
-                     (ob-http-construct-url (ob-http-request-url request) params)))))
+                     url))))
     (if print-curl
         (concat "curl "
                 (string-join (mapcar 'shell-quote-argument (ob-http-flatten args)) " ")
